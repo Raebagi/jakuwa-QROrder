@@ -34,4 +34,24 @@ public class MenuService {
 		}
 		return menu.getName();
 	}
+
+	@Transactional
+	public String toggleSoldOut(Long id) {
+		if (id == null || id <= 0) {
+			throw new IllegalArgumentException(
+				"올바른 메뉴 ID가 필요합니다."
+			);
+		}
+
+		Menu menu = menuRepository.findById(id)
+			.orElseThrow(() ->
+				new ResourceNotFoundException(
+					"메뉴를 찾을 수 없습니다. id=" + id
+				)
+			);
+
+		menu.toggleSoldOut();
+
+		return menu.getName();
+	}
 }

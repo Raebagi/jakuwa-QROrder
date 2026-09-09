@@ -1,20 +1,30 @@
 package com.raebagi.order.controller;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.raebagi.order.dto.MenuAvailabilityRequest;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.raebagi.order.service.MenuService;
+
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/admin/menus")
 @RequiredArgsConstructor
 public class MenuAdminController {
+
 	private final MenuService menuService;
 
 	@PatchMapping("/{id}/sold-out")
-	public ResponseEntity<String> changeAvailability(
-		@PathVariable("id") Long id, @RequestBody MenuAvailabilityRequest request) {
-		String name = menuService.changeAvailability(id, request.getSoldOut());
-		return ResponseEntity.ok(name + " 품절 상태 변경 완료");
+	public ResponseEntity<String> toggleSoldOut(
+		@PathVariable("id") Long id
+	) {
+		String menuName = menuService.toggleSoldOut(id);
+
+		return ResponseEntity.ok(
+			menuName + " 품절 상태 변경 완료"
+		);
 	}
 }
