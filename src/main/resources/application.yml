@@ -26,9 +26,14 @@ spring:
       path: /h2-console
 
 app:
+  order-base-url: https://operable-commerce-velvet.ngrok-free.dev/order
+
   ngrok:
     enabled: true
     domain: operable-commerce-velvet.ngrok-free.dev
 
   discord:
     webhook-url: ${DISCORD_WEBHOOK_URL}
+
+  seed:
+    enabled: true
