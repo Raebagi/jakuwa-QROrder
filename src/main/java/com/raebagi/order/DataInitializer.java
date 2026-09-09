@@ -156,7 +156,6 @@ public class DataInitializer implements CommandLineRunner {
 		menuRepository.save(new Menu("메이커스마크 샷", 7000, "하이볼", ""));
 		menuRepository.save(new Menu("오켄토션 샷", 7000, "하이볼", ""));
 		menuRepository.save(new Menu("오켄토션 하이볼", 12000, "하이볼", ""));
-		menuRepository.save(new Menu("치타 하이볼", 13000, "하이볼", ""));
 		menuRepository.save(new Menu("메이커스마크 세트", 33000, "하이볼", ""));
 		menuRepository.save(new Menu("야마자키 하이볼", 22000, "하이볼", ""));
 		menuRepository.save(new Menu("야마자키 샷", 20000, "하이볼", ""));

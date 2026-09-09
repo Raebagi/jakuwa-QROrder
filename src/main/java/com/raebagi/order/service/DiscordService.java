@@ -1,52 +1,42 @@
 package com.raebagi.order.service;
-
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
-import com.raebagi.order.entity.Order;
+import com.raebagi.order.notification.*;
 
 @Service
-public class DiscordService {
+public class DiscordService implements OrderNotifier {
+	private final RestTemplate restTemplate;
+	private final String webhookUrl;
 
-	// 중복된 부분을 제거하고 올바른 URL 하나만 남깁니다.
-	private static final String DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1536662475284418621/hK_YEoFxMJizusqtsVlvwJHOpts4gM_VveO0WIjOTR0tgkwz3pSdVOxNIuiFuM3AiiIa";
+	public DiscordService(@Qualifier("discordRestTemplate") RestTemplate restTemplate,
+		@Value("${app.discord.webhook-url}") String webhookUrl) {
+		if (webhookUrl == null || webhookUrl.isBlank()) {
+			throw new IllegalArgumentException("디스코드 웹훅 설정이 필요합니다.");
+		}
+		this.restTemplate = restTemplate;
+		this.webhookUrl = webhookUrl;
+	}
 
-	public void sendOrderNotification(Order order) {
-		RestTemplate restTemplate = new RestTemplate();
-
-		// 메뉴 목록 조합
-		StringBuilder itemsText = new StringBuilder();
-		order.getOrderItems().forEach(orderItem -> {
-			itemsText.append("• ")
-				.append(orderItem.getMenu().getName())
-				.append(" ")
-				.append(orderItem.getCount())
-				.append("개\n");
-		});
-
-		// 방 번호와 메뉴만 나오는 포맷
-		String content = "**[ " + order.getRoomNumber() + "번 방 ]**\n" + itemsText.toString();
-
-		Map<String, String> payload = new HashMap<>();
-		payload.put("content", content);
-
-		HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.APPLICATION_JSON);
-
-		HttpEntity<Map<String, String>> entity = new HttpEntity<>(payload, headers);
-
-		try {
-			restTemplate.postForObject(DISCORD_WEBHOOK_URL, entity, String.class);
-			System.out.println("디스코드 알림 전송 성공!"); // 성공 시 찍힘
-		} catch (Exception e) {
-			System.err.println("디스코드 알림 전송 실패 원인: " + e.getMessage());
-			e.printStackTrace(); // 상세 에러 스택 트레이스 출력
+	@Override
+	public void notifyOrderCreated(OrderNotification notification) {
+		String header = "[주문 " + notification.getOrderId() + " / "
+			+ notification.getRoomNumber() + "번 방]\n";
+		String content = header + String.join("\n", notification.getItemLines());
+		// 주문이 길어도 메뉴를 누락하지 않고 여러 메시지로 전송합니다.
+		for (int start = 0; start < content.length();) {
+			int end = Math.min(start + 1800, content.length());
+			if (end < content.length() && Character.isHighSurrogate(content.charAt(end - 1))) {
+				end--;
+			}
+			Map<String, Object> payload = Map.of(
+				"content", content.substring(start, end),
+				"allowed_mentions", Map.of("parse", List.of()));
+			restTemplate.postForObject(webhookUrl, payload, String.class);
+			start = end;
 		}
 	}
 }
