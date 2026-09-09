@@ -1,28 +1,73 @@
 package com.raebagi.order.config;
 
+import java.io.IOException;
+
+import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-
+@Slf4j
 @Component
+@Profile("local")
+@ConditionalOnProperty(
+	name = "app.ngrok.enabled",
+	havingValue = "true"
+)
 public class NgrokAutoRunner {
+
+	private final String domain;
+	private final int port;
+
+	private Process process;
+
+	public NgrokAutoRunner(
+		@Value("${app.ngrok.domain}") String domain,
+		@Value("${server.port:8080}") int port
+	) {
+		this.domain = domain;
+		this.port = port;
+	}
 
 	@EventListener(ApplicationReadyEvent.class)
 	public void runNgrok() {
-		// 이미 ngrok이 실행 중이거나 백그라운드 충돌을 방지하기 위해 백그라운드 프로세스로 실행
-		String domain = "operable-commerce-velvet.ngrok-free.dev";
-		String command = "ngrok http --domain=" + domain + " 8080";
+		if (process != null && process.isAlive()) {
+			return;
+		}
 
 		try {
-			ProcessBuilder processBuilder = new ProcessBuilder("cmd.exe", "/c", command);
-			// 필요시 ngrok 실행 출력을 콘솔에서 확인하려면 주석 해제
-			// processBuilder.inheritIO();
-			processBuilder.start();
-			System.out.println(">>> Ngrok 터널 자동 실행 완료: " + domain);
+			process = new ProcessBuilder(
+				"ngrok",
+				"http",
+				"--domain=" + domain,
+				String.valueOf(port)
+			)
+				.inheritIO()
+				.start();
+
+			log.info(
+				"ngrok 프로세스를 시작했습니다. domain={}, port={}",
+				domain,
+				port
+			);
 		} catch (IOException e) {
-			System.err.println(">>> Ngrok 자동 실행 실패: " + e.getMessage());
+			log.error(
+				"ngrok 실행에 실패했습니다. ngrok 설치와 PATH 설정을 확인하세요.",
+				e
+			);
+		}
+	}
+
+	@PreDestroy
+	public void stopNgrok() {
+		if (process != null && process.isAlive()) {
+			process.destroy();
+			log.info("ngrok 프로세스를 종료했습니다.");
 		}
 	}
 }
