@@ -49,4 +49,8 @@ public class Menu {
 				name + "은(는) 품절된 메뉴입니다.");
 		}
 	}
+
+	public void toggleSoldOut() {
+		this.soldOut = !this.soldOut;
+	}
 }
