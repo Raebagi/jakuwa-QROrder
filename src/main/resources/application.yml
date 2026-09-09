@@ -29,3 +29,6 @@ app:
   ngrok:
     enabled: true
     domain: operable-commerce-velvet.ngrok-free.dev
+
+  discord:
+    webhook-url: ${DISCORD_WEBHOOK_URL}
