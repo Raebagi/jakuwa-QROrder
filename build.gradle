@@ -1,0 +1,52 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.graalvm.buildtools.native' version '1.1.1'
+}
+
+group = 'com.raebagi'
+version = '0.0.1-SNAPSHOT'
+description = 'order'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+    // 1. Web (Spring MVC, REST API, 내장 톰캣)
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // 2. JPA (데이터베이스 ORM)
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // 3. Thymeleaf (서버 사이드 렌더링 - 고객용/알바생용 화면 뷰)
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    // 4. H2 Database (개발 및 테스트용 인메모리 DB - MySQL로 바꾸기 전 가볍게 테스트용)
+    runtimeOnly 'com.h2database:h2'
+
+    // 만약 바로 MySQL을 쓰고 싶다면 아래 주석을 풀고 H2를 주석 처리하세요
+    // runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // 5. Lombok (getter/setter, 생성자 자동 생성)
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // 6. qr코드용
+    implementation 'com.google.zxing:core:3.5.2'
+    implementation 'com.google.zxing:javase:3.5.2'
+
+    // 7. Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

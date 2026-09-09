@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이자카야 자쿠와 - 주문 내역</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f9f9f9; padding-bottom: 80px; }
+        h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 5px; }
+        .sub-title { text-align: center; color: #666; font-size: 14px; margin-bottom: 20px; }
+
+        .container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; }
+        .section-title { font-weight: bold; font-size: 16px; margin-bottom: 15px; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+
+        .item-row { display: flex; justify-content: space-between; font-size: 16px; margin-bottom: 15px; color: #333; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; }
+        .item-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+        .total-box { position: fixed; bottom: 0; left: 0; right: 0; background: #ff4757; color: white; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; }
+        .back-link { display: block; text-align: center; margin-top: 15px; color: #007bff; text-decoration: none; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<h1>이자카야 자쿠와</h1>
+<div class="sub-title">고잔점 실시간 메뉴 주문</div>
+
+<div class="container">
+    <div class="section-title">주문 내역</div>
+
+    <!-- 주문번호, 시간 카드 분할 없이 통합되어 출력될 공간 -->
+    <div id="order-history-list">
+        <p style="text-align:center; color:#888;">주문 내역을 불러오는 중...</p>
+    </div>
+</div>
+
+<div class="room-badge" style="display:none;">
+    현재 테이블: <span id="roomNumber" th:text="${roomNumber}">1</span>번 방
+</div>
+
+<a class="back-link" th:href="@{/order(room=${roomNumber})}">⬅️ 메뉴판으로 돌아가기</a>
+
+<div class="total-box">
+    총 결제 금액: <span id="grand-total">0</span>원
+</div>
+
+<script>
+    const roomNumber = document.getElementById('roomNumber').innerText;
+
+    window.onload = function() {
+        fetch(`/api/orders/room/${roomNumber}`)
+            .then(response => response.json())
+            .then(orders => {
+                const listDiv = document.getElementById('order-history-list');
+
+                if (!orders || orders.length === 0) {
+                    listDiv.innerHTML = '<p style="text-align:center; color:#888; margin:0;">주문 내역이 없습니다.</p>';
+                    return;
+                }
+
+                // 모든 주문 아이템을 모아서 '메뉴 이름' 기준으로 수량과 총액 합산 (중복 처리)
+                const mergedItems = {};
+
+                orders.forEach(order => {
+                    const items = order.items || order.orderItems;
+
+                    if (items) {
+                        items.forEach(item => {
+                            const name = item.menuName;
+                            const price = item.orderPrice || item.price;
+
+                            if (!mergedItems[name]) {
+                                mergedItems[name] = { count: 0, totalPrice: 0, price: price };
+                            }
+
+                            mergedItems[name].count += item.count;
+                            mergedItems[name].totalPrice += (price * item.count);
+                        });
+                    }
+                });
+
+                // 주문번호나 시간 없이 메뉴와 금액만 쫘르륵 출력
+                let itemsHtml = '';
+                let grandTotal = 0;
+
+                for (const [name, info] of Object.entries(mergedItems)) {
+                    grandTotal += info.totalPrice;
+                    itemsHtml += `
+                        <div class="item-row">
+                            <span><b>${name}</b> <span style="color:#888; font-size:14px;">(${info.price.toLocaleString()}원)</span> x ${info.count}개</span>
+                            <span><b>${info.totalPrice.toLocaleString()}원</b></span>
+                        </div>
+
+                    `;
+                }
+
+                listDiv.innerHTML = itemsHtml;
+                document.getElementById('grand-total').innerText = grandTotal.toLocaleString();
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('order-history-list').innerHTML = '<p style="text-align:center; color:red;">주문 내역을 불러오지 못했습니다.</p>';
+            });
+    };
+
+</script>
+
+</body>
+</html>

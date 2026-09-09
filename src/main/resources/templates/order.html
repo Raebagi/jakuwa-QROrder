@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자쿠와 고잔점 메뉴 주문</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #212529;
+            padding-bottom: 140px; /* 하단 고정 바 공간 확보 */
+        }
+
+        /* 상단 헤더 */
+        header {
+            background: #ffffff;
+            padding: 16px 20px;
+            text-align: center;
+            border-bottom: 1px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        header h1 { margin: 0; font-size: 20px; color: #111; font-weight: 700; }
+        header p { margin: 4px 0 0 0; font-size: 13px; color: #6c757d; }
+
+        /* 전체 레이아웃 (모바일 중심 1열 정렬) */
+        .main-layout {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        /* 모바일용 상단 카테고리 퀵 메뉴 (가로 스크롤 한 줄로 변경) */
+        .mobile-category-nav {
+            display: flex;
+            flex-wrap: nowrap; /* 줄바꿈 방지 */
+            overflow-x: auto;  /* 가로 스크롤 허용 */
+            gap: 6px;
+            padding: 10px 15px;
+            background: #ffffff;
+            border-bottom: 1px solid #dee2e6;
+            position: sticky;
+            top: 65px;
+            z-index: 40;
+            -webkit-overflow-scrolling: touch; /* 모바일 부드러운 스크롤 */
+        }
+        /* 스크롤바 숨기기 */
+        .mobile-category-nav::-webkit-scrollbar {
+            display: none;
+        }
+        .mobile-nav-btn {
+            background: #f1f3f5;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #495057;
+            cursor: pointer;
+            flex-shrink: 0; /* 버튼이 찌그러지지 않게 고정 */
+            white-space: nowrap; /* 글자 줄바꿈 방지 */
+            transition: all 0.2s;
+        }
+        .mobile-nav-btn.active {
+            background: #0984e3;
+            color: white;
+        }
+
+        /* 오른쪽 컨텐츠 영역 */
+        .content-area {
+            width: 100%;
+        }
+
+        /* 탭 네비게이션 (장바구니 / 주문내역) */
+        .tab-container {
+            display: flex;
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            border: 1px solid #e9ecef;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: none;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            border-radius: 8px;
+            color: #6c757d;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #0984e3;
+            color: white;
+            box-shadow: 0 2px 4px rgba(9, 132, 227, 0.2);
+        }
+
+        /* 카테고리 섹션 */
+        .category-section { margin-bottom: 30px; scroll-margin-top: 130px; }
+        .category-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #212529;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        .category-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 14px;
+            background-color: #0984e3;
+            margin-right: 8px;
+            border-radius: 2px;
+        }
+
+        /* 메뉴 카드 아이템 */
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 14px;
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+            border: 1px solid #e9ecef;
+            transition: all 0.2s;
+        }
+        .menu-info { flex: 1; padding-right: 12px; }
+        .menu-info h4 { margin: 0 0 4px 0; font-size: 15px; color: #212529; font-weight: 600; }
+        .menu-desc { margin: 0 0 6px 0; font-size: 12px; color: #868e96; line-height: 1.35; }
+        .menu-price { font-weight: 700; color: #212529; font-size: 14px; margin: 6px 0 0 0; }
+
+        .add-btn {
+            padding: 8px 14px;
+            background-color: #e7f5ff;
+            color: #0984e3;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            flex-shrink: 0;
+            align-self: center;
+        }
+
+        /* 품절 상태 스타일 */
+        .menu-item.sold-out {
+            background-color: #f1f3f5;
+            opacity: 0.6;
+        }
+        .badge-soldout {
+            font-size: 11px;
+            color: #ffffff;
+            font-weight: bold;
+            background-color: #fa5252;
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+
+        /* 공지 뱃지 스타일 */
+        .badge-warning { font-size: 10px; color: #c92a2a; font-weight: bold; background-color: #fff3bf; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-bottom: 3px; }
+        .badge-time { font-size: 10px; color: #d9480f; font-weight: bold; background-color: #ffec99; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-bottom: 3px; }
+
+        /* 옵션 선택 박스 스타일 */
+        .highball-option-box {
+            margin: 8px 0;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            font-size: 12px;
+        }
+        .highball-option-box span {
+            font-weight: bold;
+            color: #495057;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .highball-option-box label {
+            margin-right: 10px;
+            cursor: pointer;
+            color: #343a40;
+        }
+
+        /* 섹션 컨텐츠 전환 */
+        .section-content { display: none; }
+        .section-content.active { display: block; }
+
+        /* 장바구니 및 내역 카드 박스 */
+        .card-box { background: white; padding: 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid #e9ecef; margin-bottom: 15px; }
+        .cart-item-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f1f3f5; font-size: 14px; }
+        .cart-item-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+        .cart-controls { display: flex; align-items: center; gap: 6px; }
+        .cart-controls button { background: #f1f3f5; border: none; width: 26px; height: 26px; border-radius: 6px; font-weight: bold; cursor: pointer; color: #495057; font-size: 13px; }
+        .remove-btn { background: #fff5f5 !important; color: #c92a2a !important; font-size: 11px !important; width: auto !important; padding: 0 8px; }
+
+        /* 하단 고정 주문 바 */
+        .fixed-bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+            border-top: 1px solid #e9ecef;
+        }
+        .fixed-bottom-bar.admin-bottom-bar {
+            background-color: #fff5f5;
+            border-top: 2px solid #fa5252;
+            text-align: center;
+            font-weight: bold;
+            color: #c92a2a;
+            font-size: 14px;
+        }
+        .bottom-bar-inner { max-width: 600px; margin: 0 auto; width: 100%; }
+        .total-price-area { display: flex; justify-content: space-between; align-items: center; font-size: 15px; font-weight: bold; width: 100%; }
+        .total-price-area span.price { color: #0984e3; font-size: 18px; }
+
+        #order-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #0984e3;
+            color: white;
+            border: none;
+            font-size: 15px;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(9, 132, 227, 0.3);
+        }
+
+        /* 토스트 알림 팝업 */
+        #toast {
+            visibility: hidden;
+            min-width: 200px;
+            background-color: rgba(33, 37, 41, 0.95);
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 12px;
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            bottom: 100px;
+            transform: translateX(-50%);
+            font-size: 13px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        #toast.show { visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.7s; }
+        @keyframes fadein { from { bottom: 80px; opacity: 0; } to { bottom: 100px; opacity: 1; } }
+        @keyframes fadeout { from { bottom: 100px; opacity: 1; } to { bottom: 80px; opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div id="room-display" style="margin-top: 4px; font-weight: bold; color: #0984e3; font-size: 13px;">
+        📍 불러오는 중...
+    </div>
+</header>
+
+<!-- 모바일 전용 상단 카테고리 퀵 메뉴 (가로 스크롤 적용) -->
+<div class="mobile-category-nav" id="mobile-nav-list"></div>
+
+<div class="main-layout">
+    <div class="content-area">
+        <!-- 탭 메뉴 -->
+        <div class="tab-container" id="tab-menu-container">
+            <button class="tab-btn active" onclick="switchTab('cart')">🛒 메뉴판 / 장바구니</button>
+            <button class="tab-btn" onclick="switchTab('history')">📋 주문 내역</button>
+        </div>
+
+        <!-- 메뉴판 탭 내용 -->
+        <div id="menu-section" class="section-content active">
+            <div id="menu-list"></div>
+        </div>
+
+        <!-- 주문 내역 탭 내용 -->
+        <div id="history-section" class="section-content">
+            <div class="card-box">
+                <h3 style="margin-top: 0; color: #212529; font-size: 15px; border-bottom: 2px solid #f1f3f5; padding-bottom: 8px;">주문 내역</h3>
+                <div id="history-items-container">
+                    <p style="text-align: center; color: #adb5bd; font-size: 13px; margin: 30px 0;">주문 내역이 없습니다.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 하단 고정 장바구니 영역 -->
+<div class="fixed-bottom-bar" id="bottom-cart-bar">
+    <div class="bottom-bar-inner" id="bottom-inner-content">
+        <div id="cart-items-preview" style="max-height: 120px; overflow-y: auto; margin-bottom: 8px;"></div>
+        <div class="total-price-area">
+            <span>총 주문금액</span>
+            <span class="price"><span id="total-price">0</span>원</span>
+        </div>
+        <button id="order-btn" onclick="placeOrder()">주문하기 (<span id="cart-count">0</span>개)</button>
+    </div>
+</div>
+
+<!-- 토스트 메시지 -->
+<div id="toast">장바구니에 담겼습니다!</div>
+
+<script>
+    let menuDataMap = {};
+    let cart = {};
+    let orderHistory = [];
+    let currentRoomNumber = 1;
+    let isAdminMode = false; // 사장님 관리자 모드 여부
+
+    // ngrok 경고 페이지 우회용 공통 fetch 함수
+    function apiFetch(url, options = {}) {
+        options.headers = {
+            ...options.headers,
+            'ngrok-skip-browser-warning': 'true'
+        };
+        return fetch(url, options);
+    }
+
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomParam = urlParams.get('room');
+
+        if (roomParam !== null) {
+            currentRoomNumber = Number(roomParam);
+        }
+
+        // room이 0일 때 관리자 비밀번호 검증
+        if (currentRoomNumber === 0) {
+            const password = prompt("관리자 비밀번호를 입력하세요:");
+            if (password !== "7601") {
+                alert("비밀번호가 틀렸습니다. 일반 화면으로 이동합니다.");
+                window.location.href = window.location.pathname + '?room=1';
+                return;
+            }
+
+            isAdminMode = true;
+            document.getElementById('room-display').innerHTML = `🛠️ <span style="color: #fa5252;">[사장님 품절 관리 모드]</span>`;
+            document.getElementById('tab-menu-container').style.display = 'none';
+
+            const bottomBar = document.getElementById('bottom-cart-bar');
+            bottomBar.className = "fixed-bottom-bar admin-bottom-bar";
+            document.getElementById('bottom-inner-content').innerHTML = `🚨 메뉴를 누르면 즉시 품절/판매 상태가 전환됩니다.`;
+        } else {
+            document.getElementById('room-display').innerText = `📍 ${currentRoomNumber}번 방 이용 중`;
+        }
+
+        loadMenus();
+    };
+
+    function loadMenus() {
+        apiFetch('/api/menus')
+            .then(response => response.json())
+            .then(menus => {
+                const menuListDiv = document.getElementById('menu-list');
+                const mobileNavListDiv = document.getElementById('mobile-nav-list');
+                menuListDiv.innerHTML = '';
+                mobileNavListDiv.innerHTML = '';
+
+                const groupedMenus = menus.reduce((acc, menu) => {
+                    if (!acc[menu.category]) acc[menu.category] = [];
+                    acc[menu.category].push(menu);
+                    return acc;
+                }, {});
+
+                const order = ['사시미', '스시', '초회요리(스노모노)', '전골요리(나베모노)', '철판요리(데판야끼)', '구이요리(야끼모노)', '튀김요리(아게모노)', '식사류', '간단요리',
+                    '사케', '주류','생맥주','도쿠리','잔술','본격 소주','하이볼','음료','직원 호출'];
+
+                order.forEach(category => {
+                    if (!groupedMenus[category]) return;
+
+                    const navBtn = document.createElement('button');
+                    navBtn.className = 'mobile-nav-btn';
+                    navBtn.innerText = category;
+                    navBtn.onclick = () => scrollToSection(category);
+                    mobileNavListDiv.appendChild(navBtn);
+
+                    const section = document.createElement('div');
+                    section.className = 'category-section';
+                    section.id = `category-${category}`;
+
+                    const title = document.createElement('div');
+                    title.className = 'category-title';
+                    title.innerText = category;
+                    section.appendChild(title);
+
+                    groupedMenus[category].forEach(menu => {
+                        menuDataMap[menu.id] = menu;
+
+                        let noticeHtml = '';
+                        if (menu.soldOut) {
+                            noticeHtml += `<div><span class="badge-soldout">품절</span></div>`;
+                        }
+
+                        const friSatCloseMenus = [
+                            '오늘의 초밥 (10p)', '오늘의 초밥(10P)', '오늘의 초밥(10p)',
+                            '스페셜 초밥 (12p)', '스페셜 초밥(12P)', '스페셜 초밥(12p)',
+                            'VIP 초밥 (14p)', 'VIP 초밥(14P)', 'VIP 초밥(14p)',
+                            '자쿠와 육칼 (육개장 칼국수)'
+                        ];
+
+                        if (friSatCloseMenus.includes(menu.name)) {
+                            noticeHtml += `<div><span class="badge-warning">⚠️ 금, 토요일 주문 불가</span></div>`;
+                        }
+
+                        if (['메로 구이', '고등어 구이', '연어 머리 구이'].includes(menu.name)) {
+                            noticeHtml += `<div><span class="badge-time">⏱️ 조리시간 30분 이상 소요</span></div>`;
+                        }
+
+                        let optionHtml = '';
+                        const optionTargetMenus = ['야마자키 하이볼', '히비키 하모니 하이볼'];
+
+                        if (!isAdminMode) {
+                            if (category === '사케') {
+                                optionHtml = `
+                                    <div class="highball-option-box">
+                                        <span>음용 방식 선택 (필수)</span>
+                                        <label><input type="radio" name="base-${menu.id}" value="냉사케" checked> 냉사케</label>
+                                        <label><input type="radio" name="base-${menu.id}" value="온사케"> 온사케</label>
+                                    </div>
+                                `;
+                            } else if (optionTargetMenus.includes(menu.name)) {
+                                optionHtml = `
+                                    <div class="highball-option-box">
+                                        <span>베이스 선택 (필수)</span>
+                                        <label><input type="radio" name="base-${menu.id}" value="토닉워터" checked> 토닉워터</label>
+                                        <label><input type="radio" name="base-${menu.id}" value="진저웨일"> 진저웨일</label>
+                                        <label><input type="radio" name="base-${menu.id}" value="플레인탄산수"> 플레인탄산수</label>
+                                    </div>
+                                `;
+                            }
+                        }
+
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = menu.soldOut ? 'menu-item sold-out' : 'menu-item';
+                        itemDiv.id = `menu-card-${menu.id}`;
+
+                        let actionButtonHtml = '';
+                        if (isAdminMode) {
+                            actionButtonHtml = `<button class="add-btn" style="background-color: #fff5f5; color: #fa5252;" onclick="toggleSoldOutAdmin(${menu.id})">${menu.soldOut ? '판매재개' : '품절처리'}</button>`;
+                        } else {
+                            actionButtonHtml = `<button class="add-btn" onclick="addToCart(${menu.id})">담기</button>`;
+                        }
+
+                        itemDiv.innerHTML = `
+                            <div class="menu-info">
+                                <h4>${menu.name}</h4>
+                                <p class="menu-desc">${menu.description || ''}</p>
+                                <div id="badge-container-${menu.id}">${noticeHtml}</div>
+                                ${optionHtml}
+                                <p class="menu-price">${menu.price.toLocaleString()}원</p>
+                            </div>
+                            ${actionButtonHtml}
+                        `;
+                        section.appendChild(itemDiv);
+                    });
+                    menuListDiv.appendChild(section);
+                });
+            });
+    }
+
+    // 사장님 모드: 품절 상태 서버 토글 요청
+    function toggleSoldOutAdmin(menuId) {
+        apiFetch(`/api/admin/menus/${menuId}/sold-out`, {
+            method: 'PATCH'
+        })
+            .then(response => {
+                if (response.ok) return response.text();
+                else throw new Error("변경 실패");
+            })
+            .then(message => {
+                showCustomToast(message);
+                menuDataMap[menuId].soldOut = !menuDataMap[menuId].soldOut;
+
+                const card = document.getElementById(`menu-card-${menuId}`);
+                const badgeContainer = document.getElementById(`badge-container-${menuId}`);
+                const btn = card.querySelector('.add-btn');
+
+                if (menuDataMap[menuId].soldOut) {
+                    card.classList.add('sold-out');
+                    btn.innerText = '판매재개';
+                    badgeContainer.innerHTML = `<span class="badge-soldout">품절</span>` + badgeContainer.innerHTML;
+                } else {
+                    card.classList.remove('sold-out');
+                    btn.innerText = '품절처리';
+                    const soldoutBadge = badgeContainer.querySelector('.badge-soldout');
+                    if (soldoutBadge) soldoutBadge.remove();
+                }
+            })
+            .catch(error => {
+                showCustomToast("품절 상태 변경 실패!");
+                console.error("Error:", error);
+            });
+    }
+
+    function scrollToSection(category) {
+        switchTab('cart');
+        const targetSection = document.getElementById(`category-${category}`);
+        if (targetSection) {
+            targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function switchTab(tabName) {
+        if (isAdminMode) return;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+        const menuSection = document.getElementById('menu-section');
+        const historySection = document.getElementById('history-section');
+        const bottomBar = document.getElementById('bottom-cart-bar');
+        const mobileNav = document.getElementById('mobile-nav-list');
+
+        if (tabName === 'cart') {
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            menuSection.classList.add('active');
+            historySection.classList.remove('active');
+            bottomBar.style.display = 'flex';
+            mobileNav.style.display = 'flex';
+        } else {
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            menuSection.classList.remove('active');
+            historySection.classList.add('active');
+            bottomBar.style.display = 'none';
+            mobileNav.style.display = 'none';
+        }
+    }
+
+    function showCustomToast(text) {
+        const toast = document.getElementById("toast");
+        toast.innerText = text;
+        toast.className = "show";
+        setTimeout(() => {
+            toast.className = toast.className.replace("show", "");
+        }, 2000);
+    }
+
+    function addToCart(menuId) {
+        const menu = menuDataMap[menuId];
+
+        if (menu.soldOut) {
+            showCustomToast("현재 품절된 메뉴입니다.");
+            return;
+        }
+
+        let selectedBase = '';
+        const optionTargetMenus = ['야마자키 하이볼', '히비키 하모니 하이볼'];
+
+        if (menu.category === '사케' || optionTargetMenus.includes(menu.name)) {
+            const radios = document.getElementsByName(`base-${menuId}`);
+            for (const radio of radios) {
+                if (radio.checked) {
+                    selectedBase = radio.value;
+                    break;
+                }
+            }
+        }
+
+        const cartKey = selectedBase ? `${menuId}-${selectedBase}` : `${menuId}`;
+
+        if (!cart[cartKey]) {
+            cart[cartKey] = {
+                menuId: menu.id,
+                name: menu.name,
+                price: menu.price,
+                baseOption: selectedBase,
+                count: 0
+            };
+        }
+        cart[cartKey].count++;
+        updateCartUI();
+        showCustomToast("장바구니에 담겼습니다!");
+    }
+
+    function decreaseCount(cartKey) {
+        if (cart[cartKey]) {
+            cart[cartKey].count--;
+            if (cart[cartKey].count <= 0) {
+                delete cart[cartKey];
+            }
+            updateCartUI();
+        }
+    }
+
+    function removeItem(cartKey) {
+        delete cart[cartKey];
+        updateCartUI();
+    }
+
+    function updateCartUI() {
+        const container = document.getElementById('cart-items-preview');
+        const totalSpan = document.getElementById('total-price');
+        const countSpan = document.getElementById('cart-count');
+        container.innerHTML = '';
+
+        const keys = Object.keys(cart);
+        let totalCount = 0;
+        let totalPrice = 0;
+
+        if (keys.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #adb5bd; font-size: 12px; margin: 4px 0;">장바구니가 비어 있습니다.</p>';
+            countSpan.innerText = 0;
+            totalSpan.innerText = '0';
+            return;
+        }
+
+        keys.forEach(cartKey => {
+            const item = cart[cartKey];
+            totalCount += item.count;
+            totalPrice += item.price * item.count;
+
+            const displayName = item.baseOption ? `${item.name} (${item.baseOption})` : item.name;
+
+            const row = document.createElement('div');
+            row.className = 'cart-item-row';
+            row.innerHTML = `
+                <span style="font-weight: 500; color: #212529;">${displayName}</span>
+                <div class="cart-controls">
+                    <button onclick="decreaseCount('${cartKey}')">-</button>
+                    <span style="font-weight: bold; min-width: 14px; text-align: center;">${item.count}</span>
+                    <button onclick="addToCart(${item.menuId})">+</button>
+                    <button class="remove-btn" onclick="removeItem('${cartKey}')">삭제</button>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+
+        countSpan.innerText = totalCount;
+        totalSpan.innerText = totalPrice.toLocaleString();
+    }
+
+    function placeOrder() {
+        const keys = Object.keys(cart);
+        if (keys.length === 0) {
+            showCustomToast("메뉴를 선택해주세요!");
+            return;
+        }
+
+        let items = [];
+        keys.forEach(cartKey => {
+            items.push({
+                menuId: Number(cart[cartKey].menuId),
+                count: cart[cartKey].count,
+                baseOption: cart[cartKey].baseOption || null
+            });
+        });
+
+        const requestData = {
+            roomNumber: currentRoomNumber,
+            items: items
+        };
+
+        apiFetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestData)
+        })
+            .then(response => {
+                if (response.ok) return response.text();
+                else throw new Error("주문 실패");
+            })
+            .then(message => {
+                showCustomToast(`${currentRoomNumber}번 방 ${message}`);
+
+                let orderItems = [];
+                let orderTotal = 0;
+                keys.forEach(cartKey => {
+                    orderItems.push({ ...cart[cartKey] });
+                    orderTotal += cart[cartKey].price * cart[cartKey].count;
+                });
+
+                orderHistory.unshift({
+                    items: orderItems,
+                    total: orderTotal,
+                    time: new Date().toLocaleTimeString()
+                });
+
+                cart = {};
+                updateCartUI();
+                updateHistoryUI();
+                switchTab('history');
+            })
+            .catch(error => {
+                showCustomToast("주문 실패! 품절된 메뉴가 포함되었거나 벨을 눌러주세요.");
+                console.error("Error:", error);
+            });
+    }
+
+    function updateHistoryUI() {
+        const container = document.getElementById('history-items-container');
+        container.innerHTML = '';
+
+        if (orderHistory.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #adb5bd; font-size: 13px; margin: 30px 0;">주문 내역이 없습니다.</p>';
+            return;
+        }
+
+        const mergedItems = {};
+        let grandTotal = 0;
+
+        orderHistory.forEach(order => {
+            order.items.forEach(item => {
+                const displayName = item.baseOption ? `${item.name} (${item.baseOption})` : item.name;
+                if (!mergedItems[displayName]) {
+                    mergedItems[displayName] = { count: 0, price: item.price };
+                }
+                mergedItems[displayName].count += item.count;
+            });
+        });
+
+        let itemsHtml = '';
+        for (const [displayName, info] of Object.entries(mergedItems)) {
+            const itemTotalPrice = info.price * info.count;
+            grandTotal += itemTotalPrice;
+            itemsHtml += `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f1f3f5; font-size: 14px;">
+                    <span><b>${displayName}</b> <span style="color: #868e96; font-size: 12px;">(${info.price.toLocaleString()}원)</span> x ${info.count}개</span>
+                    <span style="font-weight: bold; color: #212529;">${itemTotalPrice.toLocaleString()}원</span>
+                </div>
+            `;
+        }
+
+        container.innerHTML = `
+            <div>${itemsHtml}</div>
+            <div style="margin-top: 15px; padding-top: 12px; border-top: 2px solid #212529; display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: bold; color: #0984e3;">
+                <span>총 결제금액</span>
+                <span>${grandTotal.toLocaleString()}원</span>
+            </div>
+        `;
+    }
+</script>
+</body>
+</html>
