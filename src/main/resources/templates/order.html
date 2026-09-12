@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>자쿠와 고잔점 메뉴 주문</title>
     <style>
         * { box-sizing: border-box; }
@@ -273,12 +275,16 @@
         @keyframes fadeout { from { bottom: 100px; opacity: 1; } to { bottom: 80px; opacity: 0; } }
     </style>
 </head>
-<body>
+<body th:attr="data-room-number=${roomNumber},data-admin-mode=${adminMode}">
 
 <header>
     <div id="room-display" style="margin-top: 4px; font-weight: bold; color: #0984e3; font-size: 13px;">
         📍 불러오는 중...
     </div>
+    <form th:if="${adminMode}" th:action="@{/logout}" method="post"
+          style="margin-top: 8px;">
+        <button type="submit" class="mobile-nav-btn">로그아웃</button>
+    </form>
 </header>
 
 <!-- 모바일 전용 상단 카테고리 퀵 메뉴 (가로 스크롤 적용) -->
@@ -328,42 +334,70 @@
     let menuDataMap = {};
     let cart = {};
     let orderHistory = [];
-    let currentRoomNumber = 1;
-    let isAdminMode = false; // 사장님 관리자 모드 여부
+    // 화면 표시에만 사용합니다. 실제 권한 검사는 서버가 수행합니다.
+    const currentRoomNumber = Number(document.body.dataset.roomNumber);
+    const isAdminMode = document.body.dataset.adminMode === 'true';
 
-    // ngrok 경고 페이지 우회용 공통 fetch 함수
-    function apiFetch(url, options = {}) {
-        options.headers = {
-            ...options.headers,
-            'ngrok-skip-browser-warning': 'true'
-        };
-        return fetch(url, options);
+    // 같은 서버의 API 요청에 세션 쿠키와 CSRF 토큰을 전달합니다.
+    async function apiFetch(url, options = {}) {
+        const target = new URL(url, window.location.href);
+        if (target.origin !== window.location.origin) {
+            throw new Error("허용되지 않은 요청 주소입니다.");
+        }
+
+        const method = (options.method || 'GET').toUpperCase();
+        const headers = new Headers(options.headers || {});
+        headers.set('ngrok-skip-browser-warning', 'true');
+
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+            const token = document.querySelector('meta[name="_csrf"]')?.content;
+            const headerName = document.querySelector('meta[name="_csrf_header"]')?.content;
+            if (!token || !headerName) {
+                throw new Error("페이지를 새로고침한 뒤 다시 시도해주세요.");
+            }
+            headers.set(headerName, token);
+        }
+
+        const response = await fetch(target.href, {
+            ...options,
+            method,
+            headers,
+            credentials: 'same-origin'
+        });
+
+        // 로그인 HTML을 주문/품절 처리 성공 응답으로 사용하지 않습니다.
+        if (response.redirected || response.status === 401) {
+            throw new Error(isAdminMode
+                ? "로그인 상태를 확인하려면 페이지를 새로고침해주세요."
+                : "페이지를 새로고침한 뒤 다시 시도해주세요.");
+        }
+        if (response.status === 403) {
+            throw new Error(isAdminMode
+                ? "관리자 권한 또는 세션이 유효하지 않습니다. 새로고침 후 다시 로그인해주세요."
+                : "요청을 확인할 수 없습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.");
+        }
+        if (!response.ok) {
+            throw new Error(`요청 처리에 실패했습니다. (HTTP ${response.status})`);
+        }
+        return response;
     }
 
     window.onload = function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomParam = urlParams.get('room');
-
-        if (roomParam !== null) {
-            currentRoomNumber = Number(roomParam);
+        if (!Number.isInteger(currentRoomNumber) || currentRoomNumber < 0 ||
+            (!isAdminMode && currentRoomNumber === 0)) {
+            document.getElementById('room-display').innerText =
+                "방 정보를 확인할 수 없습니다. QR코드로 다시 접속해주세요.";
+            document.getElementById('bottom-cart-bar').style.display = 'none';
+            return;
         }
 
-        // room이 0일 때 관리자 비밀번호 검증
-        if (currentRoomNumber === 0) {
-            const password = prompt("관리자 비밀번호를 입력하세요:");
-            if (password !== "7601") {
-                alert("비밀번호가 틀렸습니다. 일반 화면으로 이동합니다.");
-                window.location.href = window.location.pathname + '?room=1';
-                return;
-            }
-
-            isAdminMode = true;
+        if (isAdminMode) {
             document.getElementById('room-display').innerHTML = `🛠️ <span style="color: #fa5252;">[사장님 품절 관리 모드]</span>`;
             document.getElementById('tab-menu-container').style.display = 'none';
 
             const bottomBar = document.getElementById('bottom-cart-bar');
             bottomBar.className = "fixed-bottom-bar admin-bottom-bar";
-            document.getElementById('bottom-inner-content').innerHTML = `🚨 메뉴를 누르면 즉시 품절/판매 상태가 전환됩니다.`;
+            document.getElementById('bottom-inner-content').innerHTML = `🚨 품절처리 / 판매재개 버튼으로 메뉴 상태를 변경하세요.`;
         } else {
             document.getElementById('room-display').innerText = `📍 ${currentRoomNumber}번 방 이용 중`;
         }
@@ -479,11 +513,15 @@
                     });
                     menuListDiv.appendChild(section);
                 });
+            })
+            .catch(error => {
+                showCustomToast(error.message || "메뉴를 불러오지 못했습니다.");
             });
     }
 
     // 사장님 모드: 품절 상태 서버 토글 요청
     function toggleSoldOutAdmin(menuId) {
+        if (!isAdminMode) return;
         apiFetch(`/api/admin/menus/${menuId}/sold-out`, {
             method: 'PATCH'
         })
@@ -511,7 +549,7 @@
                 }
             })
             .catch(error => {
-                showCustomToast("품절 상태 변경 실패!");
+                showCustomToast(error.message || "품절 상태 변경 실패!");
                 console.error("Error:", error);
             });
     }
@@ -652,6 +690,7 @@
     }
 
     function placeOrder() {
+        if (isAdminMode) return;
         const keys = Object.keys(cart);
         if (keys.length === 0) {
             showCustomToast("메뉴를 선택해주세요!");
@@ -703,7 +742,7 @@
                 switchTab('history');
             })
             .catch(error => {
-                showCustomToast("주문 실패! 품절된 메뉴가 포함되었거나 벨을 눌러주세요.");
+                showCustomToast(error.message || "주문에 실패했습니다. 직원에게 문의해주세요.");
                 console.error("Error:", error);
             });
     }
